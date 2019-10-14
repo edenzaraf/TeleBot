@@ -65,6 +65,10 @@ db.close()
 
 # end of creating a database
 
+@bot.edited_message_handler(content_types=["text"])
+def edited_messages(message):
+    bot.send_message(message.chat.id, "Message -{}- Edited at {}".format(message.message_id, message.edit_date))
+
 
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
