@@ -67,7 +67,10 @@ db.close()
 
 @bot.edited_message_handler(content_types=["text"])
 def edited_messages(message):
-    bot.send_message(message.chat.id, "Message -{}- Edited at {}".format(message.message_id, message.edit_date))
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    message_id = message.message_id
+    bot.send_message(chat_id, "Message -{}- Edited at {} from user |{}|".format(message_id, message.edit_date, user_id))
 
 
 @bot.message_handler(commands=["start"])
@@ -1150,7 +1153,7 @@ def get_message():
 @server.route("/")
 def webhook():
     bot.remove_webhook()
-    bot.set_webhook(url="Cencored/" + bot_token)
+    bot.set_webhook(url="https://telebot-penteration.herokuapp.com/" + bot_token)
     return "!", 200
 
 
