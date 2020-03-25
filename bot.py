@@ -65,14 +65,6 @@ db.close()
 
 # end of creating a database
 
-@bot.edited_message_handler(content_types=["text"])
-def edited_messages(message):
-    user_id = message.from_user.id
-    chat_id = message.chat.id
-    message_id = message.message_id
-    bot.send_message(chat_id, "Message -{}- Edited at {} from user |{}|".format(message_id, message.edit_date, user_id))
-
-
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
     username = ""
@@ -150,12 +142,19 @@ def on_command(message):
             if is_command and command.lower() == ".help":
                 help_command(chat_id, message, user_is_admin)
                 set_time(database, user_id, chat_id, "command_time")
+            # Links command
+            if is_command and command.lower() == ".link":
+                bot_m = bot.send_message(chat_id, "Which option would you like to choose?", reply_markup=link())
+                t1 = threading.Timer(30, bot.delete_message, args=[chat_id, bot_m.message_id])
+                t1.start()
+                t2 = threading.Timer(30, bot.delete_message, args=[chat_id, message.message_id])
+                t2.start()
 
             # Google Help
-            if message.text.startswith(".google ") and command.lower() :
+            if message.text.startswith(".google ") and command.lower():
                 google(chat_id, message)
-            # Rules command
 
+            # Rules command
             if is_command and command.lower() == ".rules":
                 rules_command(chat_id, database)
                 set_time(database, user_id, chat_id, "command_time")
@@ -165,8 +164,6 @@ def on_command(message):
                 config_command(chat_id)
             elif is_command and command.lower() == ".config":
                 bot.delete_message(chat_id, message_id)
-
-
 
             # Admin Command
             if is_command and command.lower() == ".admins":
@@ -198,8 +195,6 @@ def on_command(message):
             if is_command and command.lower() == ".rank_point":
                 rank_pont(chat_id, message, chat_name)
                 set_time(database, user_id, chat_id, "Command_time")
-
-
 
             if user_is_admin and is_command and command.lower() == ".reset":
                 if user_is_admin:
@@ -235,6 +230,15 @@ def on_command(message):
             elif prefix == "." and is_text_mention and len(command) == (mention_offset + mention_length):
                 is_para_command = True
 
+
+            # rank up user mentioned
+            rank_up = user_is_admin and is_para_command and str(command.split()[0].lower()) == ".level_up"
+            if rank_up:
+                level_up_user(database, chat_id, mentioned_user_id)
+            elif is_para_command and rank_up:
+                bot.delete_message(chat_id, message.message_id)
+
+
             # Rank @user command
             rank_user = rank_on == 1 and is_para_command and str(command.split()[0].lower()) == ".rank"
             if rank_user:
@@ -254,19 +258,25 @@ def on_command(message):
             elif is_para_command and warn:
                 bot.delete_message(chat_id, message.message_id)
 
-            # Ban command - Admins command
-            ban = user_is_admin and is_para_command and str(command.split()[0].lower()) == ".ban"
-            if ban:
-                if mentioned_user_id is user_is_admin:
-                    bot.send_message(chat_id, "You cant ban an admin :/")
-                elif mentioned_user_id is not user_is_admin:
-                    ban_user(database, chat_id, message, mentioned_user_id)
-                else:
-                    bot.send_message(chat_id, "Couldn't find this user, make sure to mention him.")
+            unwarn = user_is_admin and is_para_command and str(command.split()[0].lower()) == ".unwarn"
+            if unwarn:
+                unwarn_command(database, message, mentioned_user_id, chat_id, mentioned_user_admin, mentioned_user_id)
+            elif is_para_command and warn:
+                bot.delete_message(chat_id, message.message_id)
 
-                bot.delete_message(chat_id, message.message_id)
-            elif is_para_command and ban:
-                bot.delete_message(chat_id, message.message_id)
+            # Ban command - Admins command
+            #             ban = user_is_admin and is_para_command and str(command.split()[0].lower()) == ".ban"
+            #             if ban:
+            #                 if mentioned_user_id is user_is_admin:
+            #                     bot.send_message(chat_id, "You cant ban an admin :/")
+            #                 elif mentioned_user_id is not user_is_admin:
+            #                     ban_user(database, chat_id, message, mentioned_user_id)
+            #                 else:
+            #                     bot.send_message(chat_id, "Couldn't find this user, make sure to mention him.")
+
+            #                 bot.delete_message(chat_id, message.message_id)
+            #             elif is_para_command and ban:
+            #                 bot.delete_message(chat_id, message.message_id)
 
             # Unban command - Admins command
             unban = user_is_admin and is_para_command and str(command.split()[0].lower()) == ".unban"
@@ -289,8 +299,6 @@ def on_command(message):
             elif is_para_command and point_down:
                 bot.delete_message(chat_id, message.message_id)
 
-
-
             # ----commands with multiple parameters---- #
             is_config_command = False
             config = str(command.split()[0].lower()) == ".config"
@@ -302,8 +310,6 @@ def on_command(message):
             if user_is_admin and rules:
                 config_rules_command(database, command, chat_id)
                 bot.delete_message(chat_id, message.message_id)
-
-
 
             # Config Rank command
             rank = is_config_command and str(command.split()[1].lower()) == "rank"
@@ -361,8 +367,8 @@ def callback_query(call):
     elif call.data == "help":
         rules_command(chat_id, database)
         bot_m = bot.edit_message_text("Welcome to the <b>{}</b> server!~ 👻 Script Kiddo"
-                                      .format(chat_id), chat_name, message_id, parse_mode="HTML")
-        t1 = threading.Timer(30, bot.delete_message, args=[chat_id, bot_m.message_id])
+                                      .format(chat_name), chat_id, message_id, parse_mode="HTML")
+        t1 = threading.Timer(15, bot.delete_message, args=[chat_id, bot_m.message_id])
         t1.start()
     elif call.data == "cb_close":
         bot.delete_message(chat_id, message_id)
@@ -390,6 +396,7 @@ def refresh(message, ranking):
 @bot.message_handler(content_types=["text"])
 def on_message(message):
     # checking if the message is from a group
+    global msgg
     if message.chat.type == "group" or message.chat.type == "supergroup":
         database = psycopg2.connect(host=db_host, database=db_name, user=db_user, password=db_pass, port=db_port)
         # getting data on the Message and the Chat
@@ -407,13 +414,11 @@ def on_message(message):
         rank_on = select_query(database, "Rank_on", "Chats", "chat_id", chat_id)[0]
 
         if "t.me/" in message.text:
-                if message.from_user.id != chat_admins:
-                    bot.delete_message(chat_id, message.message_id)
+            if message.from_user.id != chat_admins:
+                bot.delete_message(chat_id, message.message_id)
 
         if message.entities:
             virus_total(message, chat_id)
-
-
 
         # level system
         if rank_on == 1 and passed_time(database, user_id, chat_id, "Exp_time", 60):
@@ -432,7 +437,6 @@ def virus_total(message, chat_id):
         elif entity.type == "url":
             urls.append(entity)
 
-
     for entity in urls:
         check = str(entity)
         if check.startswith("http"):
@@ -442,12 +446,17 @@ def virus_total(message, chat_id):
             else:
                 virus_url = "https://www.virustotal.com/ui/search?query=https://{}".format(url)
             try:
-                malware = int(requests.get(virus_url).json()['data'][0]['attributes']['last_analysis_stats']['malicious'])
-                if malware > 0:
+                malware = int(
+                    requests.get(virus_url).json()['data'][0]['attributes']['last_analysis_stats']['malicious'])
+                if malware >= 3:
                     len_url = len(url)
                     half = int(len_url / 2)
                     star = "*" * half
-                    bot.send_message(chat_id, "{} Sent a Bad Link - '{}{}'".format(first_name, url[:-half], star))
+                    bot.send_message(chat_id,
+                                     "{} Sent a Bad Link - '{}{}'\nIdentified by {} anti viruses 🦠".format(first_name,
+                                                                                                            url[:-half],
+                                                                                                            star,
+                                                                                                            malware))
                     bot.delete_message(chat_id, message.message_id)
             except:
                 pass
@@ -458,15 +467,22 @@ def virus_total(message, chat_id):
             else:
                 virus_url = "https://www.virustotal.com/ui/search?query=https://{}".format(url)
             try:
-                malware = int(requests.get(virus_url).json()['data'][0]['attributes']['last_analysis_stats']['malicious'])
-                if malware > 0:
+                malware = int(
+                    requests.get(virus_url).json()['data'][0]['attributes']['last_analysis_stats']['malicious'])
+                if malware >= 3:
                     len_url = len(url)
                     half = int(len_url / 2)
                     star = "*" * half
-                    bot.send_message(chat_id, "@{} Sent a Bad Link - '{}{}'".format(first_name, url[:-half], star))
+                    bot.send_message(chat_id,
+                                     "@{} Sent a Bad Link - '{}{}'\nIdentified by {} anti viruses 🦠".format(first_name,
+                                                                                                             url[
+                                                                                                             :-half],
+                                                                                                             star,
+                                                                                                             malware))
                     bot.delete_message(chat_id, message.message_id)
             except:
                 pass
+
 
 # start of commands section
 def help_command(chat_id, message, user_is_admin):
@@ -499,10 +515,10 @@ def help_command(chat_id, message, user_is_admin):
               "*.google* - _Ask google please._\n" \
               "*.rank_point* - _See the top 10 most added users._\n" \
               "*Support the bot and the developer by donating, pay as you want:* [Paypal](https://paypal.me/Shepurchys)"
-    bot_m = bot.send_message(chat_id, msg, parse_mode="Markdown")
-    t1 = threading.Timer(30, bot.delete_message, args=[chat_id, bot_m.message_id])
+    bot_m = bot.send_message(chat_id, msg, parse_mode="Markdown", disable_web_page_preview=True)
+    t1 = threading.Timer(15, bot.delete_message, args=[chat_id, bot_m.message_id])
     t1.start()
-    t2 = threading.Timer(30, bot.delete_message, args=[chat_id, message.message_id])
+    t2 = threading.Timer(15, bot.delete_message, args=[chat_id, message.message_id])
     t2.start()
 
 
@@ -593,6 +609,8 @@ def rank_user_command(database, username_user_id, message_id, chat_id):
         t2.start()
 
 
+
+
 def config_command(chat_id):
     msg = "_---Config Commands---_\n" \
           "*.config rules <text>* - _Set/change the rules of the server.(max 5000 chars)_\n" \
@@ -607,14 +625,28 @@ def config_command(chat_id):
 
 def rules_command(chat_id, database):
     rules = select_query(database, "Rules", "Chats", "chat_id", chat_id)[0]
-    bot.send_message(chat_id, rules)
+    bot_msg = bot.send_message(chat_id, rules)
+    t1 = threading.Timer(15, bot.delete_message, args=[chat_id, bot_msg.message_id])
+    t1.start()
+
+
+def link():
+    markup = types.InlineKeyboardMarkup()
+    markup.row_width = 1
+    markup.add(InlineKeyboardButton("הקבוצה הראשית", callback_data="link", url="https://t.me/cyberspaceisrael "))
+    markup.add(InlineKeyboardButton("מחפשי עבודה", callback_data="link", url="https://t.me/cyberspacejob"))
+    markup.add(InlineKeyboardButton("עולם הסייבר", callback_data="link", url="https://t.me/cyberworldnew"))
+    markup.add(InlineKeyboardButton("Hack The Box", callback_data="link", url="https://t.me/CyberSpacehtb"))
+    markup.add(InlineKeyboardButton("תמיכה תכנית - מחשבים", callback_data="link", url="https://t.me/CyberspaceTech"))
+    markup.add(InlineKeyboardButton("CyberSpace MEMES", callback_data="link", url="https://t.me/CyberSpaceMEMES"))
+    return markup
 
 
 def bot_command(message):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(
         types.InlineKeyboardButton(text="Send a message",
-                                   url="http://t.me/let_me_test_this_bot"))
+                                   url="http://t.me/PentereationBot"))
     bot.reply_to(message, "Press the button to start a"
                           " conversation with the bot", reply_markup=keyboard)
 
@@ -643,7 +675,7 @@ def warn_command(database, message, username_user_id, chat_id, username_is_admin
                        .format(warnings, chat_id, username_user_id))
         database.commit()
         if warnings >= 3:
-            msg = "{} you have <b>warned!</b>, you currently have <b>{}</b> warnings.\n"\
+            msg = "{} you have <b>warned!</b>, you currently have <b>{}</b> warnings.\n" \
                 .format(username, warnings)
             bot.send_message(chat_id, msg, parse_mode="HTML")
             ban_user(database, chat_id, message, mentioned_user_id)
@@ -658,6 +690,41 @@ def warn_command(database, message, username_user_id, chat_id, username_is_admin
         bot.send_message(chat_id, "Couldn't find this user, make sure to mention him.",
                          reply_to_message_id=message.message_id)
 
+
+# UNWarn
+def unwarn_command(database, message, username_user_id, chat_id, username_is_admin, mentioned_user_id):
+    cursor = database.cursor()
+    username_user_id = select_query(database, "user_id", "users", "chat_id", chat_id, "user_id", username_user_id)
+    if username_user_id is not None and username_is_admin is False:
+        username_user_id = username_user_id[0]
+        username = select_query(database, "username", "users", "chat_id", chat_id, "user_id", username_user_id)
+        if username != "None":
+            username = select_query(database, "firstname", "users", "chat_id", chat_id, "user_id", username_user_id)[0]
+        else:
+            username = username[0]
+        warnings = select_query(database, "Warnings", "Users", "user_id", username_user_id, "chat_id", chat_id)[0]
+        if warnings == 0:
+            warnings = 0
+        else:
+            warnings -= 1
+        cursor.execute("UPDATE Users SET Warnings = {} WHERE chat_id = {} AND user_id = {}"
+                       .format(warnings, chat_id, username_user_id))
+        database.commit()
+        if warnings >= 3:
+            msg = "{} you have <b>warned!</b>, you currently have <b>{}</b> warnings.\n" \
+                .format(username, warnings)
+            bot.send_message(chat_id, msg, parse_mode="HTML")
+            ban_user(database, chat_id, message, mentioned_user_id)
+        else:
+            msg = "{} you have <b>warned!</b>, you currently have <b>{}</b> warnings." \
+                .format(username, warnings)
+            bot.send_message(chat_id, msg, parse_mode="HTML")
+    elif username_user_id is not None and username_is_admin:
+        bot.send_message(chat_id, "You can't warn an admin!",
+                         reply_to_message_id=message.message_id)
+    else:
+        bot.send_message(chat_id, "Couldn't find this user, make sure to mention him.",
+                         reply_to_message_id=message.message_id)
 
 def ranking_command(chat_id, message, chat_name, ret=False):
     database = psycopg2.connect(host=db_host, database=db_name, user=db_user, password=db_pass, port=db_port)
@@ -747,10 +814,11 @@ def up_point(database, message, user_id, chat_id):
         point += 1
         curs.execute("UPDATE users SET point = {} WHERE user_id = {} and chat_id = {}".format(point, user_id, chat_id))
         database.commit()
-        bot_m = bot.send_message(chat_id, "Excellent @{} !\nYou got a point".format(username))
-        t1 = threading.Timer(10, bot.delete_message, args=[chat_id, bot_m.message_id])
-        t2 = threading.Timer(10, bot.delete_message, args=[chat_id, message.message_id])
-        t1.start()
+
+        # bot_m = bot.send_message(chat_id, "Excellent @{} !\nYou got a point".format(username))
+        # t1 = threading.Timer(10, bot.delete_message, args=[chat_id, bot_m.message_id])
+        # t1.start()
+        t2 = threading.Timer(5, bot.delete_message, args=[chat_id, message.message_id])
         t2.start()
     else:
         bot_m = bot.send_message(chat_id, "Couldn't find this user, make sure to mention him.",
@@ -821,8 +889,9 @@ def rank_pont(chat_id, message, chat_name):
     database = psycopg2.connect(host=db_host, database=db_name, user=db_user, password=db_pass, port=db_port)
     cursor = database.cursor()
     try:
-        results = cursor.execute("SELECT Username,Firstname,user_id,point FROM Users WHERE chat_id = {}"
-                                 " ORDER BY point DESC LIMIT 10".format(chat_id))
+        results = cursor.execute(
+            "SELECT Username,Firstname,user_id,point FROM Users WHERE chat_id = {} AND is_admin = False"
+            " ORDER BY point DESC LIMIT 10".format(chat_id))
         results = cursor.fetchall()
     except:
         results = (["There are no users yet"])
@@ -857,7 +926,7 @@ def rank_pont(chat_id, message, chat_name):
 def google(chat_id, message):
     source = message.text
     quest = source[8:]
-    url = "https://lmgtfy.com/?q="
+    url = "https://google.com/search?q="
     for i in range(len(quest)):
         quest = quest.replace(" ", "+")
     print(quest)
@@ -949,6 +1018,23 @@ def add_experience(database, chat_id, user_id):
     database.commit()
 
 
+# add exp by parameter
+def level_up_user(database, chat_id, user_id):
+    cursor = database.cursor()
+    current_experience = select_query(database, "Experience", "Users", "user_id", user_id, "chat_id", chat_id)[0]
+    level = select_query(database, "user_level", "Users", "user_id", user_id, "chat_id", chat_id)[0]
+    exp_now = current_experience
+    exp_left = 0
+    while not level < int(exp_now ** 0.25):
+        exp_left += 5
+        exp_now += 5
+    final_exp = int(current_experience + exp_left)
+    cursor.execute("UPDATE Users SET Experience = {} WHERE chat_id = {} AND user_id = {}"
+                   .format(final_exp, chat_id, user_id))
+    database.commit()
+    level_up(database, chat_id, user_id)
+
+
 # checking every message if the user have leveled up
 def level_up(database, chat_id, user_id, username, firstname):
     cursor = database.cursor()
@@ -966,15 +1052,19 @@ def level_up(database, chat_id, user_id, username, firstname):
     level_end = int(experience ** 0.25)
 
     # checking if he leveled up and congrats him if he has username or neither
-    if level < level_end and username is not None:
+    if level <= level_end and username is not None:
         bot_m = bot.send_message(chat_id,
                                  "@{} has leveled up to level {} Congratulations 👏".format(username, (level_end - 1)))
+        # level up to user bot
+        bot.send_message("1076939555", ".rank_up {} {}".format(level, user_id))
         t1 = threading.Timer(10, bot.delete_message, args=[chat_id, bot_m.message_id])
         t1.start()
         update_info()
-    elif level < level_end:
+    elif level <= level_end:
         bot_m = bot.send_message(chat_id,
                                  "{} has leveled up to level {} Congratulations 👏".format(firstname, (level_end - 1)))
+        # level up to user bot
+        bot.send_message("1076939555", ".rank_up {} {}".format(level, user_id))
         t1 = threading.Timer(10, bot.delete_message, args=[chat_id, bot_m.message_id])
         t1.start()
         update_info()
@@ -1093,14 +1183,16 @@ def add_new_user(database, new_members, chat_id, message):
                 if member.username is not None:
                     bot_m = bot.send_message(chat_id,
                                              "@{} Welcome to the {} server!~ 🥳 Rookie! \n<i>type</i> <b>.help</b> <i>for bot commands</i>"
-                                             .format(member.username, message.chat.title), parse_mode="HTML", reply_markup=help_markup())
+                                             .format(member.username, message.chat.title), parse_mode="HTML",
+                                             reply_markup=help_markup())
                     t1 = threading.Timer(30, bot.delete_message, args=[chat_id, bot_m.message_id])
                     t1.start()
 
                 else:
                     bot_m = bot.send_message(chat_id,
                                              "{} Welcome to the {} server!~ 🥳 Scr1pt Kidd0 \n<i>type</i> <b>.help</b> <i>for bot commands</i>"
-                                             .format(member.first_name, message.chat.title), parse_mode="HTML", reply_markup=help_markup())
+                                             .format(member.first_name, message.chat.title), parse_mode="HTML",
+                                             reply_markup=help_markup())
                     t1 = threading.Timer(30, bot.delete_message, args=[chat_id, bot_m.message_id])
                     t1.start()
                     t2 = threading.Timer(30, bot.delete_message, args=[chat_id, message.message_id])
@@ -1121,6 +1213,13 @@ def ranking_keyboard():
     markup.row_width = 2
     markup.add(types.InlineKeyboardButton("🔄 Refresh", callback_data="cb_refresh"),
                types.InlineKeyboardButton("❌ Close Message", callback_data="cb_close"))
+    return markup
+
+
+def rules_keyboard():
+    markup = types.InlineKeyboardMarkup()
+    markup.row_width = 1
+    markup.add(types.InlineKeyboardButton("❌ Close Message", callback_data="cb_close"))
     return markup
 
 
@@ -1153,7 +1252,7 @@ def get_message():
 @server.route("/")
 def webhook():
     bot.remove_webhook()
-    bot.set_webhook(url="Cencored" + bot_token)
+    bot.set_webhook(url="https://telebot-penteration.herokuapp.com/" + bot_token)
     return "!", 200
 
 
